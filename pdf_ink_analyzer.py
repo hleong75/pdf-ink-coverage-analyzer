@@ -29,6 +29,9 @@ except ImportError as e:
 class PDFInkAnalyzer:
     """Analyzes ink coverage in PDF files"""
     
+    # Small epsilon value to avoid division by zero in calculations
+    EPSILON = 1e-10
+    
     def __init__(self, pdf_path: str, dpi: int = 150):
         """
         Initialize the analyzer
@@ -94,7 +97,7 @@ class PDFInkAnalyzer:
         
         # Avoid division by zero
         k_inv = 1 - k
-        k_inv = np.where(k_inv == 0, 1e-10, k_inv)
+        k_inv = np.where(k_inv == 0, self.EPSILON, k_inv)
         
         # Calculate CMY
         c = (1 - rgb[:, :, 0] - k) / k_inv
@@ -190,7 +193,7 @@ class PDFInkAnalyzer:
         
         # For UCR, reduce CMY proportionally to reach target TAC
         # The reduction is proportional to the CMY values and scaled by excess
-        cmy_sum = c + m + y + 1e-10  # Avoid division by zero
+        cmy_sum = c + m + y + self.EPSILON  # Avoid division by zero
         
         # Calculate how much each channel needs to be reduced
         # We need to reduce cmy_sum by 'excess' amount

@@ -6,6 +6,7 @@ Creates test PDFs and verifies the TAC reduction feature works correctly.
 """
 
 import sys
+import tempfile
 import numpy as np
 from pathlib import Path
 
@@ -19,10 +20,14 @@ except ImportError:
 from pdf_ink_analyzer import PDFInkAnalyzer
 
 
-def create_artificial_high_tac_pdf(output_path: str = "/tmp/artificial_high_tac.pdf"):
+def create_artificial_high_tac_pdf(output_path: str = None):
     """
     Create a PDF and manually inject CMYK values to simulate high TAC
     """
+    if output_path is None:
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+            output_path = f.name
+    
     # Create a simple test image with specific RGB values
     # We'll use this as a base and then manually test CMYK reduction
     doc = fitz.open()
@@ -72,7 +77,9 @@ def test_tac_reduction_algorithms():
     
     # Create analyzer instance with a dummy PDF (just for using the methods)
     # First create a simple dummy PDF file
-    dummy_path = "/tmp/dummy_for_test.pdf"
+    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        dummy_path = f.name
+    
     doc = fitz.open()
     page = doc.new_page(width=100, height=100)
     doc.save(dummy_path)
@@ -177,7 +184,9 @@ def test_cli_interface():
     print("✓ Basic analysis completed successfully")
     
     # Test TAC reduction
-    output_pdf = "/tmp/cli_test_reduced.pdf"
+    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        output_pdf = f.name
+    
     result = subprocess.run(
         ['python', 'pdf_ink_analyzer.py', test_pdf, 
          '--reduce-tac', '250', '--output', output_pdf],
