@@ -25,7 +25,7 @@ from typing import Dict, List, Tuple
 
 try:
     import fitz  # PyMuPDF
-    from PIL import Image, ImageCms
+    from PIL import Image
     import numpy as np
 except ImportError as e:
     print(f"Error: Required library not found. Please install dependencies: pip install -r requirements.txt")
@@ -199,18 +199,19 @@ class PDFInkAnalyzer:
     - ISO/IEC 19752: Monochrome laser toner yield methodology
     
     Advanced features:
-    - Native CMYK extraction from PDF pages when available
-    - ICC color profile-aware conversions
-    - LAB color space intermediate conversion for perceptual accuracy
-    - GCR (Gray Component Replacement) analysis
-    - Dot gain compensation
-    - Spot color detection
+    - Perceptual gamma correction (γ=2.2) for accurate color representation
+    - Gray Component Replacement (GCR) for optimal black ink usage
+    - ISO 12647-compliant dot gain compensation
+    - Comprehensive statistical analysis with standard deviations and percentiles
     """
     
     # Constants for ink volume calculations (based on ISO/IEC standards)
     PICOLITERS_TO_MILLILITERS = 1_000_000_000.0  # 1 mL = 1,000,000,000 pL
     SQ_INCH_TO_SQ_CM = 6.4516  # 1 square inch = 6.4516 square centimeters
     TONER_ML_PER_SQ_CM = 0.0005  # Average toner consumption: ~0.0005 mL per sq cm at 100% coverage
+    
+    # Conversion method identifier
+    CONVERSION_METHOD_ADVANCED_GCR = 'advanced_gcr'
     
     # Dot gain compensation factors (based on ISO 12647 standards)
     DOT_GAIN_COMPENSATION = {
@@ -223,8 +224,8 @@ class PDFInkAnalyzer:
     }
     
     def __init__(self, pdf_path: str, dpi: int = 150, printer_profile: PrinterProfile = None,
-                 iso_process: str = 'sheet_fed_coated', use_native_cmyk: bool = True,
-                 apply_dot_gain: bool = True):
+                 iso_process: str = 'sheet_fed_coated', apply_dot_gain: bool = True,
+                 gcr_percentage: float = 0.8):
         """
         Initialize the analyzer
         
@@ -233,15 +234,15 @@ class PDFInkAnalyzer:
             dpi: Resolution for rendering pages (default: 150)
             printer_profile: PrinterProfile for ink calculation (optional)
             iso_process: ISO 12647 printing process type for TAC compliance checking
-            use_native_cmyk: Try to extract native CMYK data if available (default: True)
             apply_dot_gain: Apply dot gain compensation (default: True)
+            gcr_percentage: Gray Component Replacement percentage 0.0-1.0 (default: 0.8 for 80% GCR)
         """
         self.pdf_path = Path(pdf_path)
         self.dpi = dpi
         self.printer_profile = printer_profile
         self.iso_process = iso_process
-        self.use_native_cmyk = use_native_cmyk
         self.apply_dot_gain = apply_dot_gain
+        self.gcr_percentage = max(0.0, min(1.0, gcr_percentage))  # Clamp to 0-1
         self.results = []
         
         if not self.pdf_path.exists():
@@ -265,57 +266,19 @@ class PDFInkAnalyzer:
             print(f"Analyzing page {page_num + 1}/{len(doc)}...", file=sys.stderr)
             page = doc[page_num]
             
-            # Try to extract native CMYK data first if enabled
-            cmyk_array = None
-            if self.use_native_cmyk:
-                cmyk_array = self._try_extract_native_cmyk(page)
+            # Render page to RGB pixmap
+            mat = fitz.Matrix(self.dpi / 72, self.dpi / 72)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
             
-            # If native CMYK extraction failed or not enabled, render and convert
-            if cmyk_array is None:
-                # Render page to RGB pixmap
-                mat = fitz.Matrix(self.dpi / 72, self.dpi / 72)
-                pix = page.get_pixmap(matrix=mat, alpha=False)
-                
-                # Convert to PIL Image
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                
-                # Analyze the page using RGB to CMYK conversion
-                page_result = self._analyze_page_rgb(img, page_num + 1)
-            else:
-                # Analyze using native CMYK data
-                page_result = self._analyze_page_cmyk(cmyk_array, page_num + 1)
+            # Convert to PIL Image
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             
+            # Analyze the page using RGB to CMYK conversion
+            page_result = self._analyze_page_rgb(img, page_num + 1)
             self.results.append(page_result)
         
         doc.close()
         return self.results
-    
-    def _try_extract_native_cmyk(self, page: fitz.Page) -> np.ndarray:
-        """
-        Try to extract native CMYK data from a PDF page
-        
-        Args:
-            page: PyMuPDF page object
-        
-        Returns:
-            CMYK array (height, width, 4) normalized to 0-100%, or None if extraction failed
-        """
-        try:
-            # Try to get pixmap in CMYK colorspace
-            mat = fitz.Matrix(self.dpi / 72, self.dpi / 72)
-            
-            # PyMuPDF can render to CMYK
-            # Note: This requires that the PDF actually contains CMYK data
-            # If not, it will convert RGB to CMYK internally
-            pix = page.get_pixmap(matrix=mat, alpha=False, colorspace=fitz.csGRAY)
-            
-            # Check if we got CMYK data
-            # For now, we'll return None to indicate we should use RGB conversion
-            # In a future enhancement, we could detect native CMYK PDFs
-            return None
-            
-        except Exception:
-            return None
     
     def _rgb_to_cmyk_advanced(self, rgb_array: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -345,8 +308,6 @@ class PDFInkAnalyzer:
         
         # Implement GCR (Gray Component Replacement)
         # This replaces CMY with K where appropriate, saving colored ink
-        # GCR percentage: 0 = no GCR (UCR only), 100 = maximum GCR
-        gcr_percentage = 0.8  # 80% GCR is a good balance
         
         # Calculate the minimum of CMY (this is the gray component)
         r_inv = 1 - rgb_linear[:, :, 0]
@@ -356,7 +317,7 @@ class PDFInkAnalyzer:
         gray_component = np.minimum(np.minimum(r_inv, g_inv), b_inv)
         
         # Apply GCR: use more K, less CMY
-        k = k_max * (1 - gcr_percentage) + gray_component * gcr_percentage
+        k = k_max * (1 - self.gcr_percentage) + gray_component * self.gcr_percentage
         
         # Avoid division by zero
         k_inv = 1 - k
@@ -410,25 +371,6 @@ class PDFInkAnalyzer:
         
         return c_comp, m_comp, y_comp, k_comp
     
-    def _analyze_page_cmyk(self, cmyk_array: np.ndarray, page_num: int) -> Dict:
-        """
-        Analyze a single page using native CMYK data
-        
-        Args:
-            cmyk_array: CMYK array (height, width, 4) with values 0-100%
-            page_num: Page number (1-indexed)
-        
-        Returns:
-            Dictionary with analysis results including ISO compliance
-        """
-        c, m, y, k = cmyk_array[:, :, 0], cmyk_array[:, :, 1], cmyk_array[:, :, 2], cmyk_array[:, :, 3]
-        
-        # Apply dot gain compensation if enabled
-        if self.apply_dot_gain:
-            c, m, y, k = self._apply_dot_gain_compensation(c, m, y, k)
-        
-        # Calculate statistics
-        return self._calculate_page_statistics(c, m, y, k, page_num, cmyk_array.shape[:2])
     
     def _analyze_page_rgb(self, img: Image.Image, page_num: int) -> Dict:
         """
@@ -522,7 +464,7 @@ class PDFInkAnalyzer:
             'exceeds_320': exceeds_320,
             'iso_compliance': iso_compliance,
             'dot_gain_applied': self.apply_dot_gain,
-            'conversion_method': 'advanced_gcr'
+            'conversion_method': self.CONVERSION_METHOD_ADVANCED_GCR
         }
         
         # Calculate ink volumes if printer profile is provided
@@ -750,7 +692,7 @@ class PDFInkAnalyzer:
             print(f"  TAC 95th %:  {result.get('tac_p95', 0):6.2f}%")
             
             # Print advanced conversion info if available
-            if result.get('conversion_method') == 'advanced_gcr':
+            if result.get('conversion_method') == self.CONVERSION_METHOD_ADVANCED_GCR:
                 print(f"  Conversion:  Advanced GCR (Gray Component Replacement)")
             if result.get('dot_gain_applied'):
                 print(f"  Dot Gain:    Applied ({self.DOT_GAIN_COMPENSATION.get(self.iso_process, 0.15)*100:.0f}%)")

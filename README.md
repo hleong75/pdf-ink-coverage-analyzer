@@ -491,7 +491,7 @@ The advanced conversion method provides significantly more accurate results than
 - **Real-world compensation**: Dot gain adjustment accounts for physical printing characteristics
 - **Statistical confidence**: Standard deviations help assess prediction reliability
 
-Note: PDF files may contain native CMYK data. The tool currently analyzes the rendered RGB representation but uses advanced conversion methods to maximize accuracy. Future enhancements will support direct CMYK extraction.
+**Note**: PDF files may contain native CMYK data, but this tool analyzes the rendered RGB representation using advanced conversion methods to maximize accuracy. Direct CMYK extraction is a potential future enhancement that would further improve accuracy for PDFs created with CMYK color spaces.
 
 ### DPI Settings
 
