@@ -91,10 +91,6 @@ Check TAC compliance for a specific printing process:
 python pdf_ink_analyzer.py document.pdf --iso-process newspaper
 ```
 
-```bash
-python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_standard
-```
-
 ### Multiple Copies
 
 Calculate ink consumption for printing 100 copies:
@@ -172,9 +168,6 @@ The tool supports different printer profiles for accurate ink volume calculation
 
 Each profile accounts for printer resolution and ink droplet size to provide accurate milliliter estimates based on standardized measurement methodologies.
 
-## ISO 12647 Printing Processes
-
-The tool supports different printing processes with specific TAC limits according to ISO 12647 standards:
 ## ISO 12647 Printing Processes
 
 The tool supports different printing processes with specific TAC limits according to ISO 12647 standards:
@@ -342,24 +335,6 @@ JSON files include per-page data with ISO compliance information and an optional
     "printer_profile": "Standard Inkjet",
     "iso_standard_ink_calculation": "ISO/IEC 24711"
   }
-}
-```
-    "copies": 100,
-    "cyan_avg_overall": 45.23,
-    "magenta_avg_overall": 38.67,
-    "yellow_avg_overall": 42.18,
-    "black_avg_overall": 15.92,
-    "tac_avg_overall": 142.00,
-    "tac_max_overall": 285.50,
-    "pages_exceeding_280": 1,
-    "pages_exceeding_300": 0,
-    "pages_exceeding_320": 0,
-    "ink_cyan_ml_total": 12.50,
-    "ink_magenta_ml_total": 10.67,
-    "ink_yellow_ml_total": 11.64,
-    "ink_black_ml_total": 4.39,
-    "ink_total_ml_all": 39.20,
-    "printer_profile": "Standard Inkjet"
   }
 }
 ```
@@ -398,9 +373,8 @@ When a printer profile is specified, the tool calculates the actual ink volume i
 **For Inkjet Printers (ISO/IEC 24711/24712):**
 - Calculation based on ink droplet size (picoliters) and printer resolution (DPI)
 - Accounts for number of drops per pixel required for coverage
-- Follows measurement methodologies from ISO/IEC 24711 (color inkjet) and ISO/IEC 24712 (monochrome inkjet)
 - Different profiles for standard, photo, and office inkjet printers
-- Follows measurement methodologies from ISO/IEC 24711 (color inkjet) and ISO/IEC 24712 (monochrome inkjet)
+- Follows standardized measurement methodologies from ISO/IEC 24711 (color inkjet) and ISO/IEC 24712 (monochrome inkjet)
 
 **For Laser Printers (ISO/IEC 19752):**
 - Calculation based on printed area and average toner consumption
