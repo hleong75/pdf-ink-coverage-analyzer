@@ -82,6 +82,11 @@ class PrinterProfile:
 class PDFInkAnalyzer:
     """Analyzes ink coverage in PDF files"""
     
+    # Constants for ink volume calculations
+    PICOLITERS_TO_MILLILITERS = 1_000_000_000.0  # 1 mL = 1,000,000,000 pL
+    SQ_INCH_TO_SQ_CM = 6.4516  # 1 square inch = 6.4516 square centimeters
+    TONER_ML_PER_SQ_CM = 0.0005  # Average toner consumption: ~0.0005 mL per sq cm at 100% coverage
+    
     def __init__(self, pdf_path: str, dpi: int = 150, printer_profile: PrinterProfile = None):
         """
         Initialize the analyzer
@@ -190,16 +195,15 @@ class PDFInkAnalyzer:
             # Total drops needed
             total_drops = inked_pixels * self.printer_profile.drops_per_pixel
             
-            # Convert picoliters to milliliters (1 mL = 1,000,000,000 pL)
-            ink_ml = (total_drops * self.printer_profile.ink_per_drop_pl) / 1_000_000_000.0
+            # Convert picoliters to milliliters
+            ink_ml = (total_drops * self.printer_profile.ink_per_drop_pl) / self.PICOLITERS_TO_MILLILITERS
         else:  # Laser/toner
             # For laser printers, use area-based calculation
-            # Assume average toner consumption: ~0.0005 mL per square cm at 100% coverage
             # Calculate printed area in square cm
             dpi = self.printer_profile.dpi
             area_sq_inch = (inked_pixels) / (dpi * dpi)
-            area_sq_cm = area_sq_inch * 6.4516  # 1 sq inch = 6.4516 sq cm
-            ink_ml = area_sq_cm * 0.0005  # Approximate toner consumption
+            area_sq_cm = area_sq_inch * self.SQ_INCH_TO_SQ_CM
+            ink_ml = area_sq_cm * self.TONER_ML_PER_SQ_CM
         
         return ink_ml
     

@@ -133,10 +133,11 @@ def run_test():
     print(f"\n9. Exporting to CSV: {csv_output}")
     analyzer_with_profile.export_to_csv(csv_output)
     
-    # Export to JSON
+    # Export to JSON with 25 copies for testing
     json_output = "/tmp/test_results.json"
-    print(f"\n10. Exporting to JSON: {json_output}")
-    analyzer_with_profile.export_to_json(json_output, copies=25)
+    test_copies = 25
+    print(f"\n10. Exporting to JSON (with {test_copies} copies): {json_output}")
+    analyzer_with_profile.export_to_json(json_output, copies=test_copies)
     
     # Check that CSV file was created
     assert Path(csv_output).exists(), "CSV file should exist"
