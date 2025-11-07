@@ -21,7 +21,7 @@ def test_real_vs_average_ink_calculation():
     # Create a mock scenario: 100x100 pixel image
     # Scenario 1: Half pixels at 100%, half at 0% (average = 50%)
     # Scenario 2: All pixels at 50% (average = 50%)
-    # Both have the same average, but real ink consumption should be the same!
+    # Both have the same average, and real ink consumption should be identical!
     
     width, height = 100, 100
     
@@ -66,9 +66,18 @@ def test_real_vs_average_ink_calculation():
             """New pixel-level method"""
             MIN_PRINTABLE_THRESHOLD = 1.0
             coverage_printable = np.where(coverage_array >= MIN_PRINTABLE_THRESHOLD, coverage_array, 0.0)
-            drops_per_pixel_array = (coverage_printable / 100.0) * self.printer_profile.drops_per_pixel
-            total_drops = np.sum(drops_per_pixel_array)
-            ink_ml = (total_drops * self.printer_profile.ink_per_drop_pl) / self.PICOLITERS_TO_MILLILITERS
+            
+            if self.printer_profile.ink_per_drop_pl > 0:  # Inkjet
+                drops_per_pixel_array = (coverage_printable / 100.0) * self.printer_profile.drops_per_pixel
+                total_drops = np.sum(drops_per_pixel_array)
+                ink_ml = (total_drops * self.printer_profile.ink_per_drop_pl) / self.PICOLITERS_TO_MILLILITERS
+            else:  # Laser
+                dpi = self.printer_profile.dpi
+                pixels_per_sq_inch = dpi * dpi
+                effective_inked_pixels = np.sum(coverage_printable) / 100.0
+                area_sq_inch = effective_inked_pixels / pixels_per_sq_inch
+                area_sq_cm = area_sq_inch * self.SQ_INCH_TO_SQ_CM
+                ink_ml = area_sq_cm * self.TONER_ML_PER_SQ_CM
             return ink_ml
     
     analyzer = TestAnalyzer()

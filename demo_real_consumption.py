@@ -20,8 +20,9 @@ def create_demonstration_pdf():
     
     # Very light gray background (0.5% density - below 1% threshold)
     # This simulates paper texture or very faint watermarks
+    LIGHT_GRAY_COLOR = (0.995, 0.995, 0.995)
     bg_rect = fitz.Rect(0, 0, 595, 842)
-    page.draw_rect(bg_rect, color=(0.995, 0.995, 0.995), fill=(0.995, 0.995, 0.995))
+    page.draw_rect(bg_rect, color=LIGHT_GRAY_COLOR, fill=LIGHT_GRAY_COLOR)
     
     # Add some normal text/content (high density)
     text_rect = fitz.Rect(100, 100, 495, 300)
