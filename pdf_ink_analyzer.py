@@ -633,14 +633,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Analyze a PDF and display results
+  # Analyze a PDF and display results with ink volume (uses inkjet_standard by default)
   python pdf_ink_analyzer.py document.pdf
   
-  # Calculate ink volume with printer profile
-  python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_standard
+  # Use a different printer profile
+  python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_photo
   
   # Calculate for multiple copies
-  python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_photo --copies 100
+  python pdf_ink_analyzer.py document.pdf --copies 100
   
   # Specify ISO 12647 printing process for TAC compliance
   python pdf_ink_analyzer.py document.pdf --iso-process heatset_web
@@ -655,7 +655,7 @@ Examples:
   python pdf_ink_analyzer.py document.pdf --dpi 300 --json output.json
   
 Available printer profiles (with ISO/IEC standard methodology):
-  - inkjet_standard: Standard inkjet printer (4pl drops, 600 DPI, ISO/IEC 24711)
+  - inkjet_standard: Standard inkjet printer (4pl drops, 600 DPI, ISO/IEC 24711) [DEFAULT]
   - inkjet_photo: Photo inkjet printer (2pl drops, 1200 DPI, ISO/IEC 24711)
   - inkjet_office: Office inkjet printer (10pl drops, 300 DPI, ISO/IEC 24711)
   - laser: Laser printer (600 DPI, ISO/IEC 19752)
@@ -675,7 +675,8 @@ Available ISO 12647 printing processes:
                         help='Resolution for rendering pages (default: 150)')
     parser.add_argument('--printer-profile', 
                         choices=list(PrinterProfile.PROFILES.keys()),
-                        help='Printer profile for ink volume calculation (follows ISO/IEC standards)')
+                        default='inkjet_standard',
+                        help='Printer profile for ink volume calculation (default: inkjet_standard, follows ISO/IEC standards)')
     parser.add_argument('--iso-process',
                         choices=list(ISO12647Standard.PROCESS_TAC_LIMITS.keys()),
                         default='sheet_fed_coated',
@@ -699,10 +700,8 @@ Available ISO 12647 printing processes:
         sys.exit(1)
     
     try:
-        # Create printer profile if specified
-        printer_profile = None
-        if args.printer_profile:
-            printer_profile = PrinterProfile(args.printer_profile)
+        # Create printer profile (default: inkjet_standard)
+        printer_profile = PrinterProfile(args.printer_profile)
         
         # Create analyzer and run analysis
         analyzer = PDFInkAnalyzer(

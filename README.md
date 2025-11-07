@@ -69,18 +69,18 @@ pip install -r requirements.txt
 
 ### Basic Analysis
 
-Analyze a PDF and display results in the console:
+Analyze a PDF and display results with ink volume calculation (uses inkjet_standard profile by default):
 
 ```bash
 python pdf_ink_analyzer.py document.pdf
 ```
 
-### Calculate Ink Volume with ISO Standard Methodology
+### Use Different Printer Profile
 
-Calculate required ink volume using ISO/IEC 24711 methodology for inkjet:
+Calculate required ink volume using a different printer profile:
 
 ```bash
-python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_standard
+python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_photo
 ```
 
 ### Specify ISO 12647 Printing Process
@@ -96,7 +96,7 @@ python pdf_ink_analyzer.py document.pdf --iso-process newspaper
 Calculate ink consumption for printing 100 copies:
 
 ```bash
-python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_photo --copies 100
+python pdf_ink_analyzer.py document.pdf --copies 100
 ```
 
 ### Export to CSV
@@ -112,7 +112,7 @@ python pdf_ink_analyzer.py document.pdf --csv output.csv
 Export results to JSON with summary statistics and ink calculations:
 
 ```bash
-python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_standard --copies 50 --json output.json
+python pdf_ink_analyzer.py document.pdf --copies 50 --json output.json
 ```
 
 ### High-Resolution Analysis
@@ -147,7 +147,7 @@ optional arguments:
   -h, --help            Show this help message and exit
   --dpi DPI             Resolution for rendering pages (default: 150)
   --printer-profile {inkjet_standard,inkjet_photo,inkjet_office,laser}
-                        Printer profile for ink volume calculation (uses ISO/IEC standards)
+                        Printer profile for ink volume calculation (default: inkjet_standard, uses ISO/IEC standards)
   --iso-process {sheet_fed_coated,sheet_fed_uncoated,heatset_web,coldset_web,newspaper,digital_press}
                         ISO 12647 printing process type for TAC compliance checking (default: sheet_fed_coated)
   --copies COPIES       Number of copies to calculate ink for (default: 1)
@@ -159,9 +159,9 @@ optional arguments:
 
 ## Printer Profiles
 
-The tool supports different printer profiles for accurate ink volume calculation using ISO/IEC standard methodologies:
+The tool supports different printer profiles for accurate ink volume calculation using ISO/IEC standard methodologies. **By default, the tool uses the `inkjet_standard` profile** and always calculates ink volume in milliliters.
 
-- **inkjet_standard**: Standard inkjet printer (4 picoliters per drop, 600 DPI) - uses ISO/IEC 24711 methodology
+- **inkjet_standard** (DEFAULT): Standard inkjet printer (4 picoliters per drop, 600 DPI) - uses ISO/IEC 24711 methodology
 - **inkjet_photo**: Photo inkjet printer (2 picoliters per drop, 1200 DPI) - uses ISO/IEC 24711 methodology
 - **inkjet_office**: Office inkjet printer (10 picoliters per drop, 300 DPI) - uses ISO/IEC 24711 methodology
 - **laser**: Laser/LED printer (600 DPI, toner-based calculation) - uses ISO/IEC 19752 methodology
@@ -260,11 +260,11 @@ CSV files contain one row per page with the following columns including ISO comp
 - `exceeds_280`: Boolean flag (legacy threshold)
 - `exceeds_300`: Boolean flag (legacy threshold)
 - `exceeds_320`: Boolean flag (legacy threshold)
-- `ink_cyan_ml`: Cyan ink volume in mL (if printer profile specified)
-- `ink_magenta_ml`: Magenta ink volume in mL (if printer profile specified)
-- `ink_yellow_ml`: Yellow ink volume in mL (if printer profile specified)
-- `ink_black_ml`: Black ink volume in mL (if printer profile specified)
-- `ink_total_ml`: Total ink volume in mL (if printer profile specified)
+- `ink_cyan_ml`: Cyan ink volume in mL
+- `ink_magenta_ml`: Magenta ink volume in mL
+- `ink_yellow_ml`: Yellow ink volume in mL
+- `ink_black_ml`: Black ink volume in mL
+- `ink_total_ml`: Total ink volume in mL
 - `iso_standard_used`: ISO/IEC standard used for ink calculation
 - `iso_compliance_status`: Compliance status (compliant, within_limits_caution, exceeds_limit)
 - `iso_compliance_severity`: Severity level (ok, warning, error)
@@ -368,7 +368,7 @@ These limits are defined to ensure proper ink adhesion, drying, and color reprod
 
 ### Ink Volume Calculation (ISO/IEC Standards)
 
-When a printer profile is specified, the tool calculates the actual ink volume in milliliters needed for printing using standardized methodologies:
+The tool automatically calculates the actual ink volume in milliliters needed for printing using standardized methodologies (uses `inkjet_standard` profile by default):
 
 **For Inkjet Printers (ISO/IEC 24711/24712):**
 - Calculation based on ink droplet size (picoliters) and printer resolution (DPI)
