@@ -14,7 +14,7 @@ except ImportError:
     print("Error: PyMuPDF not installed. Run: pip install -r requirements.txt")
     sys.exit(1)
 
-from pdf_ink_analyzer import PDFInkAnalyzer
+from pdf_ink_analyzer import PDFInkAnalyzer, PrinterProfile
 
 
 def create_test_pdf(output_path: str = "/tmp/test_document.pdf"):
@@ -67,31 +67,21 @@ def run_test():
     print("\n1. Creating test PDF...")
     test_pdf = create_test_pdf()
     
-    # Analyze the test PDF
-    print("\n2. Analyzing test PDF...")
+    # Test basic analysis (without printer profile)
+    print("\n2. Testing basic analysis (without printer profile)...")
     analyzer = PDFInkAnalyzer(test_pdf, dpi=150)
     results = analyzer.analyze()
     
     # Print results
-    print("\n3. Analysis Results:")
+    print("\n3. Basic Analysis Results:")
     analyzer.print_results()
     
-    # Export to CSV
-    csv_output = "/tmp/test_results.csv"
-    print(f"\n4. Exporting to CSV: {csv_output}")
-    analyzer.export_to_csv(csv_output)
-    
-    # Export to JSON
-    json_output = "/tmp/test_results.json"
-    print(f"\n5. Exporting to JSON: {json_output}")
-    analyzer.export_to_json(json_output)
-    
     # Verify basic expectations
-    print("\n6. Verification:")
+    print("\n4. Verification of basic analysis:")
     assert len(results) == 3, "Should have 3 pages"
     print("✓ Correct number of pages analyzed")
     
-    # Page 1 should have high magenta and yellow (red) - reduced threshold as rectangles don't cover full page
+    # Page 1 should have high magenta and yellow (red)
     assert results[0]['magenta_avg'] > 5, "Page 1 should have magenta"
     assert results[0]['yellow_avg'] > 5, "Page 1 should have yellow"
     assert results[0]['cyan_avg'] < 5, "Page 1 should have low cyan"
@@ -109,6 +99,45 @@ def run_test():
     assert results[2]['magenta_avg'] < 5, "Page 3 should have low magenta"
     print("✓ Page 3 (black) has expected CMYK values")
     
+    # Test with printer profile
+    print("\n5. Testing with printer profile (inkjet_standard)...")
+    profile = PrinterProfile('inkjet_standard')
+    analyzer_with_profile = PDFInkAnalyzer(test_pdf, dpi=150, printer_profile=profile)
+    results_with_profile = analyzer_with_profile.analyze()
+    
+    print("\n6. Analysis with Printer Profile:")
+    analyzer_with_profile.print_results()
+    
+    # Verify ink volume calculations
+    print("\n7. Verification of ink volume calculations:")
+    assert 'ink_total_ml' in results_with_profile[0], "Results should include ink volume"
+    print("✓ Ink volume data present in results")
+    
+    # Check that ink volumes are positive for pages with color
+    assert results_with_profile[0]['ink_magenta_ml'] > 0, "Page 1 should have magenta ink"
+    assert results_with_profile[0]['ink_yellow_ml'] > 0, "Page 1 should have yellow ink"
+    assert results_with_profile[1]['ink_cyan_ml'] > 0, "Page 2 should have cyan ink"
+    assert results_with_profile[2]['ink_black_ml'] > 0, "Page 3 should have black ink"
+    print("✓ Ink volumes calculated correctly for colored pages")
+    
+    # Test multiple copies
+    print("\n8. Testing summary with multiple copies (50 copies)...")
+    summary = analyzer_with_profile.get_summary(copies=50)
+    assert summary['copies'] == 50, "Summary should reflect 50 copies"
+    assert 'ink_total_ml_all' in summary, "Summary should include total ink volume"
+    assert summary['ink_total_ml_all'] > 0, "Total ink volume should be positive"
+    print(f"✓ Total ink for 50 copies: {summary['ink_total_ml_all']} mL")
+    
+    # Export to CSV
+    csv_output = "/tmp/test_results.csv"
+    print(f"\n9. Exporting to CSV: {csv_output}")
+    analyzer_with_profile.export_to_csv(csv_output)
+    
+    # Export to JSON
+    json_output = "/tmp/test_results.json"
+    print(f"\n10. Exporting to JSON: {json_output}")
+    analyzer_with_profile.export_to_json(json_output, copies=25)
+    
     # Check that CSV file was created
     assert Path(csv_output).exists(), "CSV file should exist"
     print(f"✓ CSV file created: {csv_output}")
@@ -116,6 +145,15 @@ def run_test():
     # Check that JSON file was created
     assert Path(json_output).exists(), "JSON file should exist"
     print(f"✓ JSON file created: {json_output}")
+    
+    # Test different printer profiles
+    print("\n11. Testing different printer profiles...")
+    for profile_name in ['inkjet_photo', 'inkjet_office', 'laser']:
+        profile = PrinterProfile(profile_name)
+        analyzer_test = PDFInkAnalyzer(test_pdf, dpi=150, printer_profile=profile)
+        results_test = analyzer_test.analyze()
+        assert 'ink_total_ml' in results_test[0], f"Profile {profile_name} should calculate ink"
+        print(f"✓ Profile '{profile_name}' works correctly")
     
     print("\n" + "=" * 80)
     print("All tests passed! ✓")
