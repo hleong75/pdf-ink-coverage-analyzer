@@ -1,15 +1,18 @@
 # PDF Ink Coverage Analyzer
 
-A Python tool to analyze CMYK ink coverage in PDF files, calculating tonal coverage percentages and Total Area Coverage (TAC) to ensure compliance with printing standards.
+A Python tool to analyze CMYK ink coverage in PDF files, calculating tonal coverage percentages, Total Area Coverage (TAC), and ink consumption in milliliters to ensure compliance with printing standards and estimate printing costs.
 
 ## Features
 
 - **CMYK Channel Analysis**: Calculate average ink percentage (tonal coverage) for each CMYK channel (Cyan, Magenta, Yellow, Black)
 - **TAC Analysis**: Compute average and maximum Total Area Coverage (TAC) per pixel
 - **Print Limit Verification**: Automatically check if TAC exceeds common printing limits (280%, 300%, 320%)
+- **Ink Volume Calculation**: Calculate required ink volume in milliliters for printing one or multiple copies
+- **Printer Profiles**: Support for different printer types (inkjet standard, photo, office, laser) with resolution awareness
+- **Multiple Copies Support**: Calculate total ink consumption for batch printing jobs
 - **Multiple Export Formats**: Export results to CSV or JSON for further analysis
 - **Page-by-Page Analysis**: Detailed breakdown for each page in multi-page PDFs
-- **Overall Summary**: Aggregate statistics across all pages
+- **Overall Summary**: Aggregate statistics across all pages with total ink requirements
 - **Open Source**: Reproducible and customizable for your needs
 
 ## Requirements
@@ -42,6 +45,22 @@ Analyze a PDF and display results in the console:
 python pdf_ink_analyzer.py document.pdf
 ```
 
+### Calculate Ink Volume
+
+Calculate required ink volume with a printer profile:
+
+```bash
+python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_standard
+```
+
+### Multiple Copies
+
+Calculate ink consumption for printing 100 copies:
+
+```bash
+python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_photo --copies 100
+```
+
 ### Export to CSV
 
 Export results to a CSV file for spreadsheet analysis:
@@ -52,10 +71,10 @@ python pdf_ink_analyzer.py document.pdf --csv output.csv
 
 ### Export to JSON
 
-Export results to JSON with summary statistics:
+Export results to JSON with summary statistics and ink calculations:
 
 ```bash
-python pdf_ink_analyzer.py document.pdf --json output.json
+python pdf_ink_analyzer.py document.pdf --printer-profile inkjet_standard --copies 50 --json output.json
 ```
 
 ### High-Resolution Analysis
@@ -77,20 +96,36 @@ python pdf_ink_analyzer.py document.pdf --csv output.csv --quiet
 ## Command Line Options
 
 ```
-usage: pdf_ink_analyzer.py [-h] [--dpi DPI] [--csv FILE] [--json FILE] 
+usage: pdf_ink_analyzer.py [-h] [--dpi DPI] 
+                           [--printer-profile {inkjet_standard,inkjet_photo,inkjet_office,laser}]
+                           [--copies COPIES] [--csv FILE] [--json FILE] 
                            [--no-summary] [--quiet] pdf_file
 
 positional arguments:
-  pdf_file        Path to PDF file to analyze
+  pdf_file              Path to PDF file to analyze
 
 optional arguments:
-  -h, --help      Show this help message and exit
-  --dpi DPI       Resolution for rendering pages (default: 150)
-  --csv FILE      Export results to CSV file
-  --json FILE     Export results to JSON file
-  --no-summary    Do not include summary in JSON output
-  --quiet, -q     Do not print results to console
+  -h, --help            Show this help message and exit
+  --dpi DPI             Resolution for rendering pages (default: 150)
+  --printer-profile {inkjet_standard,inkjet_photo,inkjet_office,laser}
+                        Printer profile for ink volume calculation
+  --copies COPIES       Number of copies to calculate ink for (default: 1)
+  --csv FILE            Export results to CSV file
+  --json FILE           Export results to JSON file
+  --no-summary          Do not include summary in JSON output
+  --quiet, -q           Do not print results to console
 ```
+
+## Printer Profiles
+
+The tool supports different printer profiles for accurate ink volume calculation:
+
+- **inkjet_standard**: Standard inkjet printer (4 picoliters per drop, 600 DPI)
+- **inkjet_photo**: Photo inkjet printer (2 picoliters per drop, 1200 DPI)
+- **inkjet_office**: Office inkjet printer (10 picoliters per drop, 300 DPI)
+- **laser**: Laser/LED printer (600 DPI, toner-based calculation)
+
+Each profile accounts for printer resolution and ink droplet size to provide accurate milliliter estimates.
 
 ## Output Format
 
@@ -101,6 +136,8 @@ The script displays detailed information for each page:
 ```
 ================================================================================
 PDF Ink Coverage Analysis: document.pdf
+Printer Profile: Standard inkjet printer (4pl drops, 600 DPI)
+Calculating for 100 copies
 ================================================================================
 
 Page 1:
@@ -110,12 +147,21 @@ Page 1:
   Black (K):    15.92%
   TAC Average: 142.00%
   TAC Maximum: 285.50%
+
+  Ink Volume (per copy):
+    Cyan:      0.1250 mL
+    Magenta:   0.1067 mL
+    Yellow:    0.1164 mL
+    Black:     0.0439 mL
+    Total:     0.3920 mL
+
   ⚠️  CAUTION: TAC exceeds 280% limit!
 
 --------------------------------------------------------------------------------
 Overall Summary:
 --------------------------------------------------------------------------------
 Total Pages:           1
+Number of Copies:      100
 Cyan Average:          45.23%
 Magenta Average:       38.67%
 Yellow Average:        42.18%
@@ -125,6 +171,13 @@ TAC Maximum Overall:  285.50%
 Pages exceeding 280%:  1
 Pages exceeding 300%:  0
 Pages exceeding 320%:  0
+
+Total Ink Volume (100 copies):
+  Cyan:     12.5000 mL
+  Magenta:  10.6700 mL
+  Yellow:   11.6400 mL
+  Black:     4.3900 mL
+  Total:    39.2000 mL
 ================================================================================
 ```
 
@@ -141,6 +194,11 @@ CSV files contain one row per page with the following columns:
 - `exceeds_280`: Boolean flag
 - `exceeds_300`: Boolean flag
 - `exceeds_320`: Boolean flag
+- `ink_cyan_ml`: Cyan ink volume in mL (if printer profile specified)
+- `ink_magenta_ml`: Magenta ink volume in mL (if printer profile specified)
+- `ink_yellow_ml`: Yellow ink volume in mL (if printer profile specified)
+- `ink_black_ml`: Black ink volume in mL (if printer profile specified)
+- `ink_total_ml`: Total ink volume in mL (if printer profile specified)
 
 ### JSON Output
 
@@ -150,6 +208,7 @@ JSON files include per-page data and an optional summary section:
 {
   "pdf_file": "document.pdf",
   "dpi": 150,
+  "printer_profile": "Standard inkjet printer (4pl drops, 600 DPI)",
   "pages": [
     {
       "page": 1,
@@ -161,11 +220,17 @@ JSON files include per-page data and an optional summary section:
       "tac_max": 285.50,
       "exceeds_280": true,
       "exceeds_300": false,
-      "exceeds_320": false
+      "exceeds_320": false,
+      "ink_cyan_ml": 0.1250,
+      "ink_magenta_ml": 0.1067,
+      "ink_yellow_ml": 0.1164,
+      "ink_black_ml": 0.0439,
+      "ink_total_ml": 0.3920
     }
   ],
   "summary": {
     "total_pages": 1,
+    "copies": 100,
     "cyan_avg_overall": 45.23,
     "magenta_avg_overall": 38.67,
     "yellow_avg_overall": 42.18,
@@ -174,7 +239,13 @@ JSON files include per-page data and an optional summary section:
     "tac_max_overall": 285.50,
     "pages_exceeding_280": 1,
     "pages_exceeding_300": 0,
-    "pages_exceeding_320": 0
+    "pages_exceeding_320": 0,
+    "ink_cyan_ml_total": 12.50,
+    "ink_magenta_ml_total": 10.67,
+    "ink_yellow_ml_total": 11.64,
+    "ink_black_ml_total": 4.39,
+    "ink_total_ml_all": 39.20,
+    "printer_profile": "Standard Inkjet"
   }
 }
 ```
@@ -201,11 +272,32 @@ Common TAC limits by printing process:
 - Sheet-fed offset: 300-320%
 - Digital printing: 280-400% (varies by equipment)
 
+### Ink Volume Calculation
+
+When a printer profile is specified, the tool calculates the actual ink volume in milliliters needed for printing:
+
+**For Inkjet Printers:**
+- Calculation based on ink droplet size (picoliters) and printer resolution (DPI)
+- Accounts for number of drops per pixel required for coverage
+- Different profiles for standard, photo, and office inkjet printers
+
+**For Laser Printers:**
+- Calculation based on printed area and average toner consumption
+- Accounts for printer resolution and toner density
+
+The ink volume is calculated per page and can be scaled for multiple copies, making it ideal for:
+- Estimating ink costs for print jobs
+- Planning ink cartridge purchases
+- Comparing printing costs across different printers
+- Budgeting for large batch printing projects
+
 ## Use Cases
 
 - **Prepress Verification**: Check if PDFs meet printing specifications before sending to press
 - **Quality Control**: Automated analysis of large batches of documents
-- **Cost Estimation**: Estimate ink consumption for printing jobs
+- **Cost Estimation**: Estimate ink consumption and cost for printing jobs based on actual printer profiles
+- **Batch Printing**: Calculate total ink requirements for printing multiple copies
+- **Ink Budget Planning**: Plan ink cartridge purchases based on predicted consumption
 - **Standards Compliance**: Ensure documents comply with ISO 12647 or other printing standards
 - **Troubleshooting**: Identify pages with excessive ink coverage that may cause printing issues
 
