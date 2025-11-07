@@ -6,6 +6,7 @@ A Python tool to analyze CMYK ink coverage in PDF files, calculating tonal cover
 
 - **CMYK Channel Analysis**: Calculate average ink percentage (tonal coverage) for each CMYK channel (Cyan, Magenta, Yellow, Black)
 - **TAC Analysis**: Compute average and maximum Total Area Coverage (TAC) per pixel
+- **TAC Reduction Tool**: Reduce excessive TAC in PDFs using GCR or UCR methods to meet printing standards
 - **Print Limit Verification**: Automatically check if TAC exceeds common printing limits (280%, 300%, 320%)
 - **Multiple Export Formats**: Export results to CSV or JSON for further analysis
 - **Page-by-Page Analysis**: Detailed breakdown for each page in multi-page PDFs
@@ -74,22 +75,46 @@ Run analysis without console output (useful for batch processing):
 python pdf_ink_analyzer.py document.pdf --csv output.csv --quiet
 ```
 
+### TAC Reduction
+
+Reduce TAC (Total Area Coverage) to meet printing standards:
+
+```bash
+# Reduce TAC to 280% using GCR (Gray Component Replacement) method
+python pdf_ink_analyzer.py document.pdf --reduce-tac 280 --output reduced.pdf
+
+# Use UCR (Under Color Removal) method instead
+python pdf_ink_analyzer.py document.pdf --reduce-tac 300 --method ucr --output reduced.pdf
+
+# Specify higher DPI for better quality reduction
+python pdf_ink_analyzer.py document.pdf --dpi 300 --reduce-tac 280 --output reduced.pdf
+```
+
+The TAC reduction feature creates a new PDF with reduced ink coverage by applying either:
+- **GCR (Gray Component Replacement)**: Replaces common CMY components with black ink
+- **UCR (Under Color Removal)**: Reduces CMY in shadow areas where black is present
+
 ## Command Line Options
 
 ```
 usage: pdf_ink_analyzer.py [-h] [--dpi DPI] [--csv FILE] [--json FILE] 
-                           [--no-summary] [--quiet] pdf_file
+                           [--no-summary] [--quiet] [--reduce-tac LIMIT]
+                           [--output FILE] [--method {gcr,ucr}] pdf_file
 
 positional arguments:
-  pdf_file        Path to PDF file to analyze
+  pdf_file              Path to PDF file to analyze
 
 optional arguments:
-  -h, --help      Show this help message and exit
-  --dpi DPI       Resolution for rendering pages (default: 150)
-  --csv FILE      Export results to CSV file
-  --json FILE     Export results to JSON file
-  --no-summary    Do not include summary in JSON output
-  --quiet, -q     Do not print results to console
+  -h, --help            Show this help message and exit
+  --dpi DPI             Resolution for rendering pages (default: 150)
+  --csv FILE            Export results to CSV file
+  --json FILE           Export results to JSON file
+  --no-summary          Do not include summary in JSON output
+  --quiet, -q           Do not print results to console
+  --reduce-tac LIMIT    Reduce TAC to specified limit (e.g., 280) and save to new PDF
+  --output, -o FILE     Output file path for reduced PDF (required with --reduce-tac)
+  --method {gcr,ucr}    TAC reduction method: gcr (Gray Component Replacement) or 
+                        ucr (Under Color Removal) (default: gcr)
 ```
 
 ## Output Format
@@ -204,6 +229,7 @@ Common TAC limits by printing process:
 ## Use Cases
 
 - **Prepress Verification**: Check if PDFs meet printing specifications before sending to press
+- **TAC Reduction**: Automatically reduce excessive ink coverage to meet printer limits
 - **Quality Control**: Automated analysis of large batches of documents
 - **Cost Estimation**: Estimate ink consumption for printing jobs
 - **Standards Compliance**: Ensure documents comply with ISO 12647 or other printing standards
@@ -230,6 +256,28 @@ The `--dpi` parameter affects analysis accuracy and speed:
 - **72-150 DPI**: Fast, suitable for quick checks
 - **150-300 DPI**: Good balance of speed and accuracy (recommended)
 - **300+ DPI**: High accuracy, slower processing, best for final verification
+
+### TAC Reduction Methods
+
+The tool provides two industry-standard methods for reducing TAC:
+
+#### GCR (Gray Component Replacement)
+- Replaces common CMY components with black ink (K)
+- More effective for colors with neutral components
+- Reduces overall ink consumption
+- Better for cost savings and faster drying
+- Example: A color with C=70%, M=70%, Y=70%, K=50% would have 30% of each CMY replaced with K
+
+#### UCR (Under Color Removal)
+- Reduces CMY in shadow areas where black is already present
+- Preserves color fidelity better in midtones
+- More selective reduction
+- Better for images with rich blacks
+- Example: Reduces CMY proportionally in areas with high K values
+
+**When to use each method:**
+- Use **GCR** for general purpose TAC reduction and when cost savings are important
+- Use **UCR** when color accuracy is critical and you want to preserve midtone colors
 
 ## Limitations
 

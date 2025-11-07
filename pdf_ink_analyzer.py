@@ -109,6 +109,127 @@ class PDFInkAnalyzer:
         
         return c, m, y, k
     
+    def _reduce_tac_gcr(self, c: np.ndarray, m: np.ndarray, y: np.ndarray, k: np.ndarray, 
+                        target_tac: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Reduce TAC using GCR (Gray Component Replacement)
+        
+        Replaces common CMY components with black ink to reduce total ink coverage.
+        
+        Args:
+            c, m, y, k: CMYK arrays (0-100%)
+            target_tac: Target maximum TAC value
+        
+        Returns:
+            Tuple of reduced (C, M, Y, K) arrays
+        """
+        # Calculate current TAC
+        tac = c + m + y + k
+        
+        # Find pixels exceeding target TAC
+        exceeds = tac > target_tac
+        
+        if not np.any(exceeds):
+            return c, m, y, k
+        
+        # Copy arrays to avoid modifying originals
+        c_new = c.copy()
+        m_new = m.copy()
+        y_new = y.copy()
+        k_new = k.copy()
+        
+        # Vectorized GCR application
+        # Find minimum of CMY (gray component) for all pixels
+        gray = np.minimum(np.minimum(c, m), y)
+        
+        # Calculate how much to reduce for pixels exceeding target
+        excess = np.maximum(0, tac - target_tac)
+        reduction = np.minimum(gray, excess)
+        
+        # Apply reduction only where TAC exceeds target
+        mask = exceeds.astype(float)
+        c_new = c - reduction * mask
+        m_new = m - reduction * mask
+        y_new = y - reduction * mask
+        k_new = np.minimum(100, k + reduction * mask)
+        
+        return c_new, m_new, y_new, k_new
+    
+    def _reduce_tac_ucr(self, c: np.ndarray, m: np.ndarray, y: np.ndarray, k: np.ndarray, 
+                        target_tac: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Reduce TAC using UCR (Under Color Removal)
+        
+        Reduces CMY in shadow areas where black is present.
+        
+        Args:
+            c, m, y, k: CMYK arrays (0-100%)
+            target_tac: Target maximum TAC value
+        
+        Returns:
+            Tuple of reduced (C, M, Y, K) arrays
+        """
+        # Calculate current TAC
+        tac = c + m + y + k
+        
+        # Find pixels exceeding target TAC
+        exceeds = tac > target_tac
+        
+        if not np.any(exceeds):
+            return c, m, y, k
+        
+        # Copy arrays to avoid modifying originals
+        c_new = c.copy()
+        m_new = m.copy()
+        y_new = y.copy()
+        k_new = k.copy()
+        
+        # Vectorized UCR application
+        # Calculate how much to reduce
+        excess = np.maximum(0, tac - target_tac)
+        
+        # For UCR, reduce CMY proportionally to reach target TAC
+        # The reduction is proportional to the CMY values and scaled by excess
+        cmy_sum = c + m + y + 1e-10  # Avoid division by zero
+        
+        # Calculate how much each channel needs to be reduced
+        # We need to reduce cmy_sum by 'excess' amount
+        # Distribute the reduction proportionally
+        reduction_ratio = excess / cmy_sum
+        
+        # Apply reduction only where TAC exceeds target
+        mask = exceeds.astype(float)
+        c_new = np.maximum(0, c - c * reduction_ratio * mask)
+        m_new = np.maximum(0, m - m * reduction_ratio * mask)
+        y_new = np.maximum(0, y - y * reduction_ratio * mask)
+        
+        return c_new, m_new, y_new, k_new
+    
+    def _cmyk_to_rgb(self, c: np.ndarray, m: np.ndarray, y: np.ndarray, k: np.ndarray) -> np.ndarray:
+        """
+        Convert CMYK to RGB
+        
+        Args:
+            c, m, y, k: CMYK arrays (0-100%)
+        
+        Returns:
+            RGB array (0-255)
+        """
+        # Normalize to 0-1
+        c = c / 100.0
+        m = m / 100.0
+        y = y / 100.0
+        k = k / 100.0
+        
+        # Convert to RGB
+        r = (1 - c) * (1 - k)
+        g = (1 - m) * (1 - k)
+        b = (1 - y) * (1 - k)
+        
+        # Convert to 0-255 range
+        rgb = np.stack([r, g, b], axis=2) * 255
+        return rgb.astype(np.uint8)
+    
     def _analyze_page(self, img: Image.Image, page_num: int) -> Dict:
         """
         Analyze a single page
@@ -225,6 +346,126 @@ class PDFInkAnalyzer:
         
         print(f"Results exported to JSON: {output_path}", file=sys.stderr)
     
+    def reduce_tac_and_save(self, output_path: str, target_tac: float = 280, method: str = 'gcr') -> Dict:
+        """
+        Reduce TAC in PDF and save to new file
+        
+        Args:
+            output_path: Path to save the reduced PDF
+            target_tac: Target maximum TAC value (default: 280%)
+            method: Reduction method - 'gcr' or 'ucr' (default: 'gcr')
+        
+        Returns:
+            Dictionary with before/after statistics
+        """
+        if method not in ['gcr', 'ucr']:
+            raise ValueError("Method must be 'gcr' or 'ucr'")
+        
+        print(f"Reducing TAC to {target_tac}% using {method.upper()} method...", file=sys.stderr)
+        
+        try:
+            doc = fitz.open(self.pdf_path)
+        except Exception as e:
+            raise RuntimeError(f"Failed to open PDF: {e}")
+        
+        # Create new PDF for output
+        output_doc = fitz.open()
+        
+        before_stats = []
+        after_stats = []
+        
+        for page_num in range(len(doc)):
+            print(f"Processing page {page_num + 1}/{len(doc)}...", file=sys.stderr)
+            page = doc[page_num]
+            
+            # Render page to RGB pixmap
+            mat = fitz.Matrix(self.dpi / 72, self.dpi / 72)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            
+            # Convert to PIL Image
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            rgb_array = np.array(img)
+            
+            # Convert to CMYK
+            c, m, y, k = self._rgb_to_cmyk(rgb_array)
+            
+            # Store before statistics
+            tac_before = c + m + y + k
+            before_stats.append({
+                'page': page_num + 1,
+                'tac_avg': float(np.mean(tac_before)),
+                'tac_max': float(np.max(tac_before))
+            })
+            
+            # Apply TAC reduction
+            if method == 'gcr':
+                c_new, m_new, y_new, k_new = self._reduce_tac_gcr(c, m, y, k, target_tac)
+            else:  # ucr
+                c_new, m_new, y_new, k_new = self._reduce_tac_ucr(c, m, y, k, target_tac)
+            
+            # Store after statistics
+            tac_after = c_new + m_new + y_new + k_new
+            after_stats.append({
+                'page': page_num + 1,
+                'tac_avg': float(np.mean(tac_after)),
+                'tac_max': float(np.max(tac_after))
+            })
+            
+            # Convert back to RGB
+            rgb_new = self._cmyk_to_rgb(c_new, m_new, y_new, k_new)
+            
+            # Create new PIL Image
+            img_new = Image.fromarray(rgb_new, 'RGB')
+            
+            # Save to temporary bytes buffer
+            from io import BytesIO
+            img_buffer = BytesIO()
+            img_new.save(img_buffer, format='PNG')
+            img_bytes = img_buffer.getvalue()
+            
+            # Create new page with same dimensions as original
+            new_page = output_doc.new_page(width=page.rect.width, height=page.rect.height)
+            
+            # Insert the reduced image
+            new_page.insert_image(new_page.rect, stream=img_bytes)
+        
+        # Save the output PDF
+        output_doc.save(output_path)
+        output_doc.close()
+        doc.close()
+        
+        # Calculate summary statistics
+        avg_reduction_avg = np.mean([before_stats[i]['tac_avg'] - after_stats[i]['tac_avg'] 
+                                      for i in range(len(before_stats))])
+        avg_reduction_max = np.mean([before_stats[i]['tac_max'] - after_stats[i]['tac_max'] 
+                                      for i in range(len(before_stats))])
+        
+        result = {
+            'method': method.upper(),
+            'target_tac': target_tac,
+            'before': {
+                'avg_tac': round(np.mean([s['tac_avg'] for s in before_stats]), 2),
+                'max_tac': round(max([s['tac_max'] for s in before_stats]), 2)
+            },
+            'after': {
+                'avg_tac': round(np.mean([s['tac_avg'] for s in after_stats]), 2),
+                'max_tac': round(max([s['tac_max'] for s in after_stats]), 2)
+            },
+            'reduction': {
+                'avg_tac': round(avg_reduction_avg, 2),
+                'max_tac': round(avg_reduction_max, 2)
+            },
+            'output_file': output_path
+        }
+        
+        print(f"\nTAC reduction complete! Saved to: {output_path}", file=sys.stderr)
+        print(f"Average TAC: {result['before']['avg_tac']}% → {result['after']['avg_tac']}% "
+              f"(-{result['reduction']['avg_tac']}%)", file=sys.stderr)
+        print(f"Maximum TAC: {result['before']['max_tac']}% → {result['after']['max_tac']}% "
+              f"(-{result['reduction']['max_tac']}%)", file=sys.stderr)
+        
+        return result
+    
     def print_results(self):
         """Print results to console in a formatted way"""
         if not self.results:
@@ -286,6 +527,12 @@ Examples:
   
   # Use higher resolution for more accurate analysis
   python pdf_ink_analyzer.py document.pdf --dpi 300 --json output.json
+  
+  # Reduce TAC to 280% using GCR method
+  python pdf_ink_analyzer.py document.pdf --reduce-tac 280 --output reduced.pdf
+  
+  # Reduce TAC using UCR method
+  python pdf_ink_analyzer.py document.pdf --reduce-tac 300 --method ucr --output reduced.pdf
         """
     )
     
@@ -300,30 +547,68 @@ Examples:
                         help='Do not include summary in JSON output')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='Do not print results to console')
+    parser.add_argument('--reduce-tac', type=float, metavar='LIMIT',
+                        help='Reduce TAC to specified limit (e.g., 280) and save to new PDF')
+    parser.add_argument('--output', '-o', metavar='FILE',
+                        help='Output file path for reduced PDF (required with --reduce-tac)')
+    parser.add_argument('--method', choices=['gcr', 'ucr'], default='gcr',
+                        help='TAC reduction method: gcr (Gray Component Replacement) or ucr (Under Color Removal) (default: gcr)')
     
     args = parser.parse_args()
     
+    # Validate arguments
+    if args.reduce_tac and not args.output:
+        parser.error("--reduce-tac requires --output to be specified")
+    
+    if args.output and not args.reduce_tac:
+        parser.error("--output requires --reduce-tac to be specified")
+    
     try:
-        # Create analyzer and run analysis
+        # Create analyzer
         analyzer = PDFInkAnalyzer(args.pdf_file, dpi=args.dpi)
-        analyzer.analyze()
         
-        # Print results to console unless quiet mode
-        if not args.quiet:
-            analyzer.print_results()
-        
-        # Export to CSV if requested
-        if args.csv:
-            analyzer.export_to_csv(args.csv)
-        
-        # Export to JSON if requested
-        if args.json:
-            analyzer.export_to_json(args.json, include_summary=not args.no_summary)
-        
-        # If neither export option specified and quiet mode, remind user
-        if args.quiet and not args.csv and not args.json:
-            print("Warning: Quiet mode enabled but no export format specified.", file=sys.stderr)
-            print("Use --csv or --json to export results.", file=sys.stderr)
+        # If TAC reduction is requested
+        if args.reduce_tac:
+            result = analyzer.reduce_tac_and_save(args.output, target_tac=args.reduce_tac, method=args.method)
+            
+            # Print reduction summary
+            if not args.quiet:
+                print("\n" + "=" * 80)
+                print(f"TAC Reduction Summary")
+                print("=" * 80)
+                print(f"Method:           {result['method']}")
+                print(f"Target TAC:       {result['target_tac']}%")
+                print(f"\nBefore Reduction:")
+                print(f"  Average TAC:    {result['before']['avg_tac']}%")
+                print(f"  Maximum TAC:    {result['before']['max_tac']}%")
+                print(f"\nAfter Reduction:")
+                print(f"  Average TAC:    {result['after']['avg_tac']}%")
+                print(f"  Maximum TAC:    {result['after']['max_tac']}%")
+                print(f"\nReduction:")
+                print(f"  Average TAC:    -{result['reduction']['avg_tac']}%")
+                print(f"  Maximum TAC:    -{result['reduction']['max_tac']}%")
+                print(f"\nOutput saved to: {result['output_file']}")
+                print("=" * 80 + "\n")
+        else:
+            # Run normal analysis
+            analyzer.analyze()
+            
+            # Print results to console unless quiet mode
+            if not args.quiet:
+                analyzer.print_results()
+            
+            # Export to CSV if requested
+            if args.csv:
+                analyzer.export_to_csv(args.csv)
+            
+            # Export to JSON if requested
+            if args.json:
+                analyzer.export_to_json(args.json, include_summary=not args.no_summary)
+            
+            # If neither export option specified and quiet mode, remind user
+            if args.quiet and not args.csv and not args.json:
+                print("Warning: Quiet mode enabled but no export format specified.", file=sys.stderr)
+                print("Use --csv or --json to export results.", file=sys.stderr)
     
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
