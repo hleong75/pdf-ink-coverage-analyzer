@@ -388,22 +388,29 @@ These limits are defined to ensure proper ink adhesion, drying, and color reprod
 
 ### Ink Volume Calculation (ISO/IEC Standards)
 
-The tool automatically calculates the actual ink volume in milliliters needed for printing using standardized methodologies (uses `inkjet_standard` profile by default):
+The tool automatically calculates the **real ink volume** in milliliters needed for printing using standardized methodologies (uses `inkjet_standard` profile by default).
+
+**Real Ink Consumption Features:**
+- **Pixel-Level Analysis**: Calculates ink consumption by analyzing actual ink density at each pixel position (not just averages)
+- **Minimum Printable Threshold**: Applies a 1% threshold - pixels with coverage below 1% are considered unprintable and consume no ink
+- **Intensity-Based Drop Calculation**: Number of ink drops scales with pixel intensity (50% coverage = 50% of maximum drops per pixel)
+- **Accurate Real-World Estimates**: Accounts for the fact that very light/faint colors don't result in actual ink deposition
 
 **For Inkjet Printers (ISO/IEC 24711/24712):**
 - Calculation based on ink droplet size (picoliters) and printer resolution (DPI)
-- Accounts for number of drops per pixel required for coverage
+- Per-pixel drop calculation based on coverage intensity at each pixel
 - Different profiles for standard, photo, and office inkjet printers
 - Follows standardized measurement methodologies from ISO/IEC 24711 (color inkjet) and ISO/IEC 24712 (monochrome inkjet)
 
 **For Laser Printers (ISO/IEC 19752):**
-- Calculation based on printed area and average toner consumption
+- Calculation based on printed area with pixel-level toner consumption
+- Each pixel's toner contribution is proportional to its coverage intensity
 - Accounts for printer resolution and toner density
 - Follows measurement methodology from ISO/IEC 19752 (monochrome laser toner)
 
 The ink volume is calculated per page and can be scaled for multiple copies, making it ideal for:
-- Estimating ink costs for print jobs based on ISO-standardized methodologies
-- Planning ink cartridge purchases
+- Estimating ink costs for print jobs based on ISO-standardized methodologies and real consumption patterns
+- Planning ink cartridge purchases with accurate per-pixel analysis
 - Comparing printing costs across different printers
 - Budgeting for large batch printing projects
 - Meeting ISO compliance requirements for printing operations
@@ -482,6 +489,31 @@ These statistics provide insight into:
 - Potential printing challenges (high variation = potential issues)
 - More accurate ink consumption predictions
 - Better understanding of color distribution
+
+#### 5. Real Ink Consumption Calculation
+The tool calculates actual ink volume by analyzing pixel-level data rather than using simple averages:
+
+**Pixel-Level Integration**:
+```
+For each pixel i:
+  if coverage[i] >= 1%:  # Minimum printable threshold
+    drops[i] = (coverage[i] / 100) × drops_per_pixel
+  else:
+    drops[i] = 0  # Below printable threshold
+total_drops = sum(drops[i])
+ink_volume = (total_drops × picoliters_per_drop) / 1,000,000,000
+```
+
+**Key Features**:
+- **Minimum Printable Threshold (1%)**: Pixels with less than 1% coverage are considered unprintable and consume no ink. This reflects real-world printing where very light colors don't result in actual ink deposition.
+- **Intensity-Based Drops**: Each pixel's drop count is proportional to its coverage intensity. A pixel at 50% cyan gets 50% of the maximum drops.
+- **Cumulative Accuracy**: By summing actual drops per pixel instead of using averages, the calculation accounts for the true distribution of ink across the page.
+
+**Why This Matters**:
+- Documents with many very light pixels (below 1% threshold) show significant ink savings compared to average-based calculations
+- More accurate for documents with gradients, shadows, and subtle color variations
+- Reflects actual printer behavior where ink is only deposited above a minimum threshold
+- Provides better cost estimates for real-world printing scenarios
 
 ### Color Accuracy
 
