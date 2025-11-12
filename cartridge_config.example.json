@@ -3,28 +3,35 @@
     "cyan": {
       "pages_per_cartridge": 200,
       "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
       "description": "Cyan cartridge specification"
     },
     "magenta": {
       "pages_per_cartridge": 200,
       "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
       "description": "Magenta cartridge specification"
     },
     "yellow": {
       "pages_per_cartridge": 200,
       "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
       "description": "Yellow cartridge specification"
     },
     "black": {
       "pages_per_cartridge": 400,
       "price_per_cartridge": 30.00,
+      "ml_per_cartridge": 10.0,
       "description": "Black cartridge specification"
     }
   },
   "notes": [
     "This is an example configuration file for cartridge specifications.",
     "Adjust 'pages_per_cartridge' based on your cartridge's rated page yield.",
+    "Adjust 'ml_per_cartridge' based on your cartridge's ink volume capacity.",
     "Adjust 'price_per_cartridge' based on your cartridge's actual cost.",
+    "When 'ml_per_cartridge' is provided, cost calculation uses actual ink volume (more accurate).",
+    "When only 'pages_per_cartridge' is provided, cost calculation uses page yield estimation.",
     "Copy this file and modify it to match your specific cartridge specifications."
   ]
 }

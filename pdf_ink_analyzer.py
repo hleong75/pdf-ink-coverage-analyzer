@@ -211,6 +211,10 @@ class CartridgeConfig:
         self.magenta_price = None
         self.yellow_price = None
         self.black_price = None
+        self.cyan_ml = None
+        self.magenta_ml = None
+        self.yellow_ml = None
+        self.black_ml = None
         
         if config_path:
             self._load_from_file(config_path)
@@ -232,21 +236,25 @@ class CartridgeConfig:
             if 'cyan' in cartridge_config:
                 self.cyan_pages = cartridge_config['cyan'].get('pages_per_cartridge')
                 self.cyan_price = cartridge_config['cyan'].get('price_per_cartridge')
+                self.cyan_ml = cartridge_config['cyan'].get('ml_per_cartridge')
             
             # Load magenta configuration
             if 'magenta' in cartridge_config:
                 self.magenta_pages = cartridge_config['magenta'].get('pages_per_cartridge')
                 self.magenta_price = cartridge_config['magenta'].get('price_per_cartridge')
+                self.magenta_ml = cartridge_config['magenta'].get('ml_per_cartridge')
             
             # Load yellow configuration
             if 'yellow' in cartridge_config:
                 self.yellow_pages = cartridge_config['yellow'].get('pages_per_cartridge')
                 self.yellow_price = cartridge_config['yellow'].get('price_per_cartridge')
+                self.yellow_ml = cartridge_config['yellow'].get('ml_per_cartridge')
             
             # Load black configuration
             if 'black' in cartridge_config:
                 self.black_pages = cartridge_config['black'].get('pages_per_cartridge')
                 self.black_price = cartridge_config['black'].get('price_per_cartridge')
+                self.black_ml = cartridge_config['black'].get('ml_per_cartridge')
                 
         except FileNotFoundError:
             raise FileNotFoundError(f"Cartridge configuration file not found: {config_path}")
@@ -270,10 +278,12 @@ class CartridgeConfig:
         """
         Calculate cartridge consumption and costs
         
-        This is a simplified calculation based on page yield ratings.
-        The calculation assumes:
-        - Cartridge page yield is based on ISO/IEC 24711/24712 standard test pages
-        - Real consumption is proportional to the number of pages printed
+        The calculation method depends on available configuration:
+        - If ml_per_cartridge is provided: Uses actual ink volume consumption (more accurate)
+        - Otherwise: Uses page yield (pages_per_cartridge)
+        
+        The ink volume method is more accurate as it accounts for actual document ink density
+        rather than assuming average coverage per page.
         
         Args:
             ink_cyan_ml: Cyan ink volume in mL
@@ -291,36 +301,72 @@ class CartridgeConfig:
         total_pages_printed = total_pages * copies
         
         # Calculate cyan
-        if self.cyan_pages and self.cyan_price:
-            cartridges_needed = total_pages_printed / self.cyan_pages
-            cost = cartridges_needed * self.cyan_price
-            result['cyan_cartridges'] = round(cartridges_needed, 4)
-            result['cyan_cost'] = round(cost, 2)
-            total_cost += cost
+        if self.cyan_price:
+            if self.cyan_ml:
+                # Use ink volume method (more accurate)
+                cartridges_needed = ink_cyan_ml / self.cyan_ml
+            elif self.cyan_pages:
+                # Fallback to page yield method
+                cartridges_needed = total_pages_printed / self.cyan_pages
+            else:
+                cartridges_needed = 0
+            
+            if cartridges_needed > 0:
+                cost = cartridges_needed * self.cyan_price
+                result['cyan_cartridges'] = round(cartridges_needed, 4)
+                result['cyan_cost'] = round(cost, 2)
+                total_cost += cost
         
         # Calculate magenta
-        if self.magenta_pages and self.magenta_price:
-            cartridges_needed = total_pages_printed / self.magenta_pages
-            cost = cartridges_needed * self.magenta_price
-            result['magenta_cartridges'] = round(cartridges_needed, 4)
-            result['magenta_cost'] = round(cost, 2)
-            total_cost += cost
+        if self.magenta_price:
+            if self.magenta_ml:
+                # Use ink volume method (more accurate)
+                cartridges_needed = ink_magenta_ml / self.magenta_ml
+            elif self.magenta_pages:
+                # Fallback to page yield method
+                cartridges_needed = total_pages_printed / self.magenta_pages
+            else:
+                cartridges_needed = 0
+            
+            if cartridges_needed > 0:
+                cost = cartridges_needed * self.magenta_price
+                result['magenta_cartridges'] = round(cartridges_needed, 4)
+                result['magenta_cost'] = round(cost, 2)
+                total_cost += cost
         
         # Calculate yellow
-        if self.yellow_pages and self.yellow_price:
-            cartridges_needed = total_pages_printed / self.yellow_pages
-            cost = cartridges_needed * self.yellow_price
-            result['yellow_cartridges'] = round(cartridges_needed, 4)
-            result['yellow_cost'] = round(cost, 2)
-            total_cost += cost
+        if self.yellow_price:
+            if self.yellow_ml:
+                # Use ink volume method (more accurate)
+                cartridges_needed = ink_yellow_ml / self.yellow_ml
+            elif self.yellow_pages:
+                # Fallback to page yield method
+                cartridges_needed = total_pages_printed / self.yellow_pages
+            else:
+                cartridges_needed = 0
+            
+            if cartridges_needed > 0:
+                cost = cartridges_needed * self.yellow_price
+                result['yellow_cartridges'] = round(cartridges_needed, 4)
+                result['yellow_cost'] = round(cost, 2)
+                total_cost += cost
         
         # Calculate black
-        if self.black_pages and self.black_price:
-            cartridges_needed = total_pages_printed / self.black_pages
-            cost = cartridges_needed * self.black_price
-            result['black_cartridges'] = round(cartridges_needed, 4)
-            result['black_cost'] = round(cost, 2)
-            total_cost += cost
+        if self.black_price:
+            if self.black_ml:
+                # Use ink volume method (more accurate)
+                cartridges_needed = ink_black_ml / self.black_ml
+            elif self.black_pages:
+                # Fallback to page yield method
+                cartridges_needed = total_pages_printed / self.black_pages
+            else:
+                cartridges_needed = 0
+            
+            if cartridges_needed > 0:
+                cost = cartridges_needed * self.black_price
+                result['black_cartridges'] = round(cartridges_needed, 4)
+                result['black_cost'] = round(cost, 2)
+                total_cost += cost
         
         result['total_cost'] = round(total_cost, 2)
         return result

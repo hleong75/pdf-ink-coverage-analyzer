@@ -158,21 +158,25 @@ python pdf_ink_analyzer.py document.pdf --copies 100 --cartridge-config my_cartr
     "cyan": {
       "pages_per_cartridge": 200,
       "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
       "description": "Cyan cartridge specification"
     },
     "magenta": {
       "pages_per_cartridge": 200,
       "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
       "description": "Magenta cartridge specification"
     },
     "yellow": {
       "pages_per_cartridge": 200,
       "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
       "description": "Yellow cartridge specification"
     },
     "black": {
       "pages_per_cartridge": 400,
       "price_per_cartridge": 30.00,
+      "ml_per_cartridge": 10.0,
       "description": "Black cartridge specification"
     }
   }
@@ -183,6 +187,10 @@ When using cartridge configuration, the tool will calculate:
 - Number of cartridges needed for each color
 - Cost per color
 - Total printing cost
+
+**Calculation Methods:**
+- **With `ml_per_cartridge` (recommended)**: Uses actual ink volume consumption for precise cost calculation based on document ink density
+- **With `pages_per_cartridge` only**: Uses page yield estimation (less accurate, assumes average coverage per page)
 
 **Note**: This is an optional feature. The program works exactly as before if no cartridge configuration is provided. See `cartridge_config.example.json` for a complete example.
 
