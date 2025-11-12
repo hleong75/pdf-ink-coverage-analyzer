@@ -188,6 +188,190 @@ class PrinterProfile:
         self.iso_standard = profile['iso_standard']
 
 
+class CartridgeConfig:
+    """
+    Cartridge configuration for cost calculation
+    
+    Allows users to specify cartridge page yield and pricing for each color
+    to calculate estimated cartridge consumption and costs.
+    """
+    
+    def __init__(self, config_path: str = None):
+        """
+        Initialize cartridge configuration
+        
+        Args:
+            config_path: Path to JSON configuration file (optional)
+        """
+        self.cyan_pages = None
+        self.magenta_pages = None
+        self.yellow_pages = None
+        self.black_pages = None
+        self.cyan_price = None
+        self.magenta_price = None
+        self.yellow_price = None
+        self.black_price = None
+        self.cyan_ml = None
+        self.magenta_ml = None
+        self.yellow_ml = None
+        self.black_ml = None
+        
+        if config_path:
+            self._load_from_file(config_path)
+    
+    def _load_from_file(self, config_path: str):
+        """
+        Load cartridge configuration from JSON file
+        
+        Args:
+            config_path: Path to JSON configuration file
+        """
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            cartridge_config = config.get('cartridge_configuration', {})
+            
+            # Load cyan configuration
+            if 'cyan' in cartridge_config:
+                self.cyan_pages = cartridge_config['cyan'].get('pages_per_cartridge')
+                self.cyan_price = cartridge_config['cyan'].get('price_per_cartridge')
+                self.cyan_ml = cartridge_config['cyan'].get('ml_per_cartridge')
+            
+            # Load magenta configuration
+            if 'magenta' in cartridge_config:
+                self.magenta_pages = cartridge_config['magenta'].get('pages_per_cartridge')
+                self.magenta_price = cartridge_config['magenta'].get('price_per_cartridge')
+                self.magenta_ml = cartridge_config['magenta'].get('ml_per_cartridge')
+            
+            # Load yellow configuration
+            if 'yellow' in cartridge_config:
+                self.yellow_pages = cartridge_config['yellow'].get('pages_per_cartridge')
+                self.yellow_price = cartridge_config['yellow'].get('price_per_cartridge')
+                self.yellow_ml = cartridge_config['yellow'].get('ml_per_cartridge')
+            
+            # Load black configuration
+            if 'black' in cartridge_config:
+                self.black_pages = cartridge_config['black'].get('pages_per_cartridge')
+                self.black_price = cartridge_config['black'].get('price_per_cartridge')
+                self.black_ml = cartridge_config['black'].get('ml_per_cartridge')
+                
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Cartridge configuration file not found: {config_path}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in cartridge configuration file: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load cartridge configuration: {e}")
+    
+    def is_configured(self) -> bool:
+        """Check if any cartridge configuration is present"""
+        return any([
+            self.cyan_pages is not None,
+            self.magenta_pages is not None,
+            self.yellow_pages is not None,
+            self.black_pages is not None
+        ])
+    
+    def calculate_cost(self, ink_cyan_ml: float, ink_magenta_ml: float, 
+                      ink_yellow_ml: float, ink_black_ml: float,
+                      total_pages: int, copies: int) -> Dict:
+        """
+        Calculate cartridge consumption and costs
+        
+        The calculation method depends on available configuration:
+        - If ml_per_cartridge is provided: Uses actual ink volume consumption (more accurate)
+        - Otherwise: Uses page yield (pages_per_cartridge)
+        
+        The ink volume method is more accurate as it accounts for actual document ink density
+        rather than assuming average coverage per page.
+        
+        Args:
+            ink_cyan_ml: Cyan ink volume in mL
+            ink_magenta_ml: Magenta ink volume in mL
+            ink_yellow_ml: Yellow ink volume in mL
+            ink_black_ml: Black ink volume in mL
+            total_pages: Total number of pages in document
+            copies: Number of copies
+        
+        Returns:
+            Dictionary with cartridge and cost information
+        """
+        result = {}
+        total_cost = 0.0
+        total_pages_printed = total_pages * copies
+        
+        # Calculate cyan
+        if self.cyan_price:
+            if self.cyan_ml:
+                # Use ink volume method (more accurate)
+                cartridges_needed = ink_cyan_ml / self.cyan_ml
+            elif self.cyan_pages:
+                # Fallback to page yield method
+                cartridges_needed = total_pages_printed / self.cyan_pages
+            else:
+                cartridges_needed = 0
+            
+            if cartridges_needed > 0:
+                cost = cartridges_needed * self.cyan_price
+                result['cyan_cartridges'] = round(cartridges_needed, 4)
+                result['cyan_cost'] = round(cost, 2)
+                total_cost += cost
+        
+        # Calculate magenta
+        if self.magenta_price:
+            if self.magenta_ml:
+                # Use ink volume method (more accurate)
+                cartridges_needed = ink_magenta_ml / self.magenta_ml
+            elif self.magenta_pages:
+                # Fallback to page yield method
+                cartridges_needed = total_pages_printed / self.magenta_pages
+            else:
+                cartridges_needed = 0
+            
+            if cartridges_needed > 0:
+                cost = cartridges_needed * self.magenta_price
+                result['magenta_cartridges'] = round(cartridges_needed, 4)
+                result['magenta_cost'] = round(cost, 2)
+                total_cost += cost
+        
+        # Calculate yellow
+        if self.yellow_price:
+            if self.yellow_ml:
+                # Use ink volume method (more accurate)
+                cartridges_needed = ink_yellow_ml / self.yellow_ml
+            elif self.yellow_pages:
+                # Fallback to page yield method
+                cartridges_needed = total_pages_printed / self.yellow_pages
+            else:
+                cartridges_needed = 0
+            
+            if cartridges_needed > 0:
+                cost = cartridges_needed * self.yellow_price
+                result['yellow_cartridges'] = round(cartridges_needed, 4)
+                result['yellow_cost'] = round(cost, 2)
+                total_cost += cost
+        
+        # Calculate black
+        if self.black_price:
+            if self.black_ml:
+                # Use ink volume method (more accurate)
+                cartridges_needed = ink_black_ml / self.black_ml
+            elif self.black_pages:
+                # Fallback to page yield method
+                cartridges_needed = total_pages_printed / self.black_pages
+            else:
+                cartridges_needed = 0
+            
+            if cartridges_needed > 0:
+                cost = cartridges_needed * self.black_price
+                result['black_cartridges'] = round(cartridges_needed, 4)
+                result['black_cost'] = round(cost, 2)
+                total_cost += cost
+        
+        result['total_cost'] = round(total_cost, 2)
+        return result
+
+
 class PDFInkAnalyzer:
     """
     Analyzes ink coverage in PDF files with ISO standard compliance
@@ -225,7 +409,7 @@ class PDFInkAnalyzer:
     
     def __init__(self, pdf_path: str, dpi: int = 150, printer_profile: PrinterProfile = None,
                  iso_process: str = 'sheet_fed_coated', apply_dot_gain: bool = True,
-                 gcr_percentage: float = 0.8):
+                 gcr_percentage: float = 0.8, cartridge_config: CartridgeConfig = None):
         """
         Initialize the analyzer
         
@@ -236,6 +420,7 @@ class PDFInkAnalyzer:
             iso_process: ISO 12647 printing process type for TAC compliance checking
             apply_dot_gain: Apply dot gain compensation (default: True)
             gcr_percentage: Gray Component Replacement percentage 0.0-1.0 (default: 0.8 for 80% GCR)
+            cartridge_config: CartridgeConfig for cost calculation (optional)
         """
         self.pdf_path = Path(pdf_path)
         self.dpi = dpi
@@ -243,6 +428,7 @@ class PDFInkAnalyzer:
         self.iso_process = iso_process
         self.apply_dot_gain = apply_dot_gain
         self.gcr_percentage = max(0.0, min(1.0, gcr_percentage))  # Clamp to 0-1
+        self.cartridge_config = cartridge_config
         self.results = []
         
         if not self.pdf_path.exists():
@@ -631,6 +817,18 @@ class PDFInkAnalyzer:
             summary['ink_total_ml_all'] = round(sum(r['ink_total_ml'] for r in self.results) * copies, 4)
             summary['printer_profile'] = self.printer_profile.name
             summary['iso_standard_ink_calculation'] = self.printer_profile.iso_standard
+            
+            # Add cartridge and cost calculations if cartridge config is provided
+            if self.cartridge_config and self.cartridge_config.is_configured():
+                cost_info = self.cartridge_config.calculate_cost(
+                    summary['ink_cyan_ml_total'],
+                    summary['ink_magenta_ml_total'],
+                    summary['ink_yellow_ml_total'],
+                    summary['ink_black_ml_total'],
+                    len(self.results),
+                    copies
+                )
+                summary.update(cost_info)
         
         return summary
     
@@ -814,6 +1012,19 @@ class PDFInkAnalyzer:
             print(f"  Yellow:  {summary['ink_yellow_ml_total']:8.4f} mL")
             print(f"  Black:   {summary['ink_black_ml_total']:8.4f} mL")
             print(f"  Total:   {summary['ink_total_ml_all']:8.4f} mL")
+            
+            # Print cartridge consumption and costs if available
+            if 'total_cost' in summary:
+                print(f"\nCartridge Consumption and Cost ({copies} {'copy' if copies == 1 else 'copies'}):")
+                if 'cyan_cartridges' in summary:
+                    print(f"  Cyan:    {summary['cyan_cartridges']:8.4f} cartridges = ${summary['cyan_cost']:8.2f}")
+                if 'magenta_cartridges' in summary:
+                    print(f"  Magenta: {summary['magenta_cartridges']:8.4f} cartridges = ${summary['magenta_cost']:8.2f}")
+                if 'yellow_cartridges' in summary:
+                    print(f"  Yellow:  {summary['yellow_cartridges']:8.4f} cartridges = ${summary['yellow_cost']:8.2f}")
+                if 'black_cartridges' in summary:
+                    print(f"  Black:   {summary['black_cartridges']:8.4f} cartridges = ${summary['black_cost']:8.2f}")
+                print(f"  Total Cost: ${summary['total_cost']:8.2f}")
         
         print("=" * 80 + "\n")
 
@@ -875,6 +1086,8 @@ Available ISO 12647 printing processes:
                         help='ISO 12647 printing process type for TAC compliance checking (default: sheet_fed_coated)')
     parser.add_argument('--copies', type=int, default=1,
                         help='Number of copies to calculate ink for (default: 1)')
+    parser.add_argument('--cartridge-config', metavar='FILE',
+                        help='Path to cartridge configuration JSON file for cost calculation (optional)')
     parser.add_argument('--csv', metavar='FILE',
                         help='Export results to CSV file')
     parser.add_argument('--json', metavar='FILE',
@@ -895,12 +1108,18 @@ Available ISO 12647 printing processes:
         # Create printer profile (default: inkjet_standard)
         printer_profile = PrinterProfile(args.printer_profile)
         
+        # Load cartridge configuration if provided
+        cartridge_config = None
+        if args.cartridge_config:
+            cartridge_config = CartridgeConfig(args.cartridge_config)
+        
         # Create analyzer and run analysis
         analyzer = PDFInkAnalyzer(
             args.pdf_file, 
             dpi=args.dpi, 
             printer_profile=printer_profile,
-            iso_process=args.iso_process
+            iso_process=args.iso_process,
+            cartridge_config=cartridge_config
         )
         analyzer.analyze()
         

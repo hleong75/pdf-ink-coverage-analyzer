@@ -20,6 +20,7 @@ A Python tool to analyze CMYK ink coverage in PDF files, calculating tonal cover
 - **Ink Volume Calculation**: Calculate required ink volume in milliliters for printing one or multiple copies
 - **Printer Profiles**: Support for different printer types (inkjet standard, photo, office, laser) with resolution awareness
 - **Multiple Copies Support**: Calculate total ink consumption for batch printing jobs
+- **Cartridge Cost Calculation**: Optional feature to calculate cartridge consumption and printing costs based on your cartridge specifications
 
 ### Workflow & Export
 - **Multiple Printing Processes**: Support for different ISO 12647 printing processes (sheet-fed, web offset, newspaper, digital press)
@@ -141,13 +142,65 @@ Run analysis without console output (useful for batch processing):
 python pdf_ink_analyzer.py document.pdf --csv output.csv --quiet
 ```
 
+### Cost Calculation with Cartridge Configuration
+
+Calculate printing costs by providing a cartridge configuration file with your cartridge specifications:
+
+```bash
+python pdf_ink_analyzer.py document.pdf --copies 100 --cartridge-config my_cartridges.json
+```
+
+**Example cartridge configuration file** (`my_cartridges.json`):
+
+```json
+{
+  "cartridge_configuration": {
+    "cyan": {
+      "pages_per_cartridge": 200,
+      "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
+      "description": "Cyan cartridge specification"
+    },
+    "magenta": {
+      "pages_per_cartridge": 200,
+      "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
+      "description": "Magenta cartridge specification"
+    },
+    "yellow": {
+      "pages_per_cartridge": 200,
+      "price_per_cartridge": 25.00,
+      "ml_per_cartridge": 5.0,
+      "description": "Yellow cartridge specification"
+    },
+    "black": {
+      "pages_per_cartridge": 400,
+      "price_per_cartridge": 30.00,
+      "ml_per_cartridge": 10.0,
+      "description": "Black cartridge specification"
+    }
+  }
+}
+```
+
+When using cartridge configuration, the tool will calculate:
+- Number of cartridges needed for each color
+- Cost per color
+- Total printing cost
+
+**Calculation Methods:**
+- **With `ml_per_cartridge` (recommended)**: Uses actual ink volume consumption for precise cost calculation based on document ink density
+- **With `pages_per_cartridge` only**: Uses page yield estimation (less accurate, assumes average coverage per page)
+
+**Note**: This is an optional feature. The program works exactly as before if no cartridge configuration is provided. See `cartridge_config.example.json` for a complete example.
+
 ## Command Line Options
 
 ```
 usage: pdf_ink_analyzer.py [-h] [--dpi DPI] 
                            [--printer-profile {inkjet_standard,inkjet_photo,inkjet_office,laser}]
                            [--iso-process {sheet_fed_coated,sheet_fed_uncoated,heatset_web,coldset_web,newspaper,digital_press}]
-                           [--copies COPIES] [--csv FILE] [--json FILE] 
+                           [--copies COPIES] [--cartridge-config FILE] [--csv FILE] [--json FILE] 
                            [--no-summary] [--quiet] pdf_file
 
 positional arguments:
@@ -161,6 +214,8 @@ optional arguments:
   --iso-process {sheet_fed_coated,sheet_fed_uncoated,heatset_web,coldset_web,newspaper,digital_press}
                         ISO 12647 printing process type for TAC compliance checking (default: sheet_fed_coated)
   --copies COPIES       Number of copies to calculate ink for (default: 1)
+  --cartridge-config FILE
+                        Path to cartridge configuration JSON file for cost calculation (optional)
   --csv FILE            Export results to CSV file (includes ISO compliance data)
   --json FILE           Export results to JSON file (includes ISO compliance data)
   --no-summary          Do not include summary in JSON output
@@ -258,6 +313,13 @@ Total Ink Volume (100 copies):
   Yellow:   11.6400 mL
   Black:     4.3900 mL
   Total:    39.2000 mL
+
+Cartridge Consumption and Cost (100 copies):
+  Cyan:      0.5000 cartridges = $   12.50
+  Magenta:   0.5333 cartridges = $   13.33
+  Yellow:    0.5820 cartridges = $   14.55
+  Black:     0.1097 cartridges = $    3.29
+  Total Cost: $   43.67
 ================================================================================
 ```
 
@@ -266,6 +328,7 @@ Total Ink Volume (100 copies):
 - **TAC Percentiles**: Median and 95th percentile provide better understanding of TAC distribution
 - **Conversion Method**: Indicates "Advanced GCR" for sophisticated color conversion
 - **Dot Gain Application**: Shows percentage of dot gain compensation applied based on ISO process
+- **Cartridge Consumption and Cost** (when `--cartridge-config` is provided): Shows number of cartridges needed and total cost for each color
 
 ### CSV Output
 
@@ -353,11 +416,22 @@ JSON files include per-page data with ISO compliance information and an optional
     "ink_black_ml_total": 4.39,
     "ink_total_ml_all": 39.20,
     "printer_profile": "Standard Inkjet",
-    "iso_standard_ink_calculation": "ISO/IEC 24711"
+    "iso_standard_ink_calculation": "ISO/IEC 24711",
+    "cyan_cartridges": 0.5000,
+    "cyan_cost": 12.50,
+    "magenta_cartridges": 0.5333,
+    "magenta_cost": 13.33,
+    "yellow_cartridges": 0.5820,
+    "yellow_cost": 14.55,
+    "black_cartridges": 0.1097,
+    "black_cost": 3.29,
+    "total_cost": 43.67
   }
   }
 }
 ```
+
+**Note**: The `summary` section includes cartridge consumption and cost fields (`cyan_cartridges`, `cyan_cost`, etc., and `total_cost`) only when a cartridge configuration file is provided via the `--cartridge-config` option. Without this option, these fields are not included.
 
 ## Understanding the Results
 
@@ -420,7 +494,9 @@ The ink volume is calculated per page and can be scaled for multiple copies, mak
 - **Prepress Verification**: Check if PDFs meet ISO 12647 printing specifications before sending to press
 - **Quality Control**: Automated analysis of large batches of documents with ISO compliance verification
 - **Cost Estimation**: Estimate ink consumption and cost for printing jobs based on ISO/IEC standardized methodologies
+- **Accurate Cost Calculation**: Use cartridge configuration to calculate precise printing costs based on your actual cartridge prices and page yields
 - **Batch Printing**: Calculate total ink requirements for printing multiple copies
+- **Budget Planning**: Calculate exact costs for large print jobs using actual cartridge pricing
 - **Ink Budget Planning**: Plan ink cartridge purchases based on predicted consumption using ISO standards
 - **Standards Compliance**: Ensure documents comply with ISO 12647 or other international printing standards
 - **Printing Process Selection**: Determine which ISO 12647 process is most appropriate for your document
